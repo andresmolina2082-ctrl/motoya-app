@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { View, Platform, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '@/theme';
+import MotoIA from '@/features/ai/MotoIA';
 
 function TabIcon({
   nameFocused,
@@ -30,64 +31,87 @@ function TabIcon({
 
 export default function TabsLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primaryDark,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: styles.label,
-        tabBarStyle: styles.tabBar,
-      }}
-    >
-      {/* 1. Pedir Moto (Home) */}
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Pedir Moto',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon
-              nameFocused="bicycle"
-              nameOutline="bicycle-outline"
-              focused={focused}
-            />
-          ),
+    <View style={styles.root}>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: colors.primaryDark,
+          tabBarInactiveTintColor: colors.textMuted,
+          tabBarLabelStyle: styles.label,
+          tabBarStyle: styles.tabBar,
         }}
-      />
+      >
+        {/* 1. Pedir Moto (Home) */}
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: 'Pedir Moto',
+            tabBarIcon: ({ focused }) => (
+              <TabIcon
+                nameFocused="bicycle"
+                nameOutline="bicycle-outline"
+                focused={focused}
+              />
+            ),
+          }}
+        />
 
-      {/* 2. Historial de Carreras */}
-      <Tabs.Screen
-        name="trips"
-        options={{
-          title: 'Mis Viajes',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon
-              nameFocused="time"
-              nameOutline="time-outline"
-              focused={focused}
-            />
-          ),
-        }}
-      />
+        {/* 2. Historial de Carreras */}
+        <Tabs.Screen
+          name="trips"
+          options={{
+            title: 'Mis Viajes',
+            tabBarIcon: ({ focused }) => (
+              <TabIcon
+                nameFocused="time"
+                nameOutline="time-outline"
+                focused={focused}
+              />
+            ),
+          }}
+        />
 
-      {/* 3. Perfil & Billetera */}
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Mi Perfil',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon
-              nameFocused="person"
-              nameOutline="person-outline"
-              focused={focused}
-            />
-          ),
-        }}
-      />
-    </Tabs>
+        {/* 3. GeoCam Persistente (CRUD + Relaciones) */}
+        <Tabs.Screen
+          name="geocam"
+          options={{
+            title: 'GeoCam',
+            tabBarIcon: ({ focused }) => (
+              <TabIcon
+                nameFocused="camera"
+                nameOutline="camera-outline"
+                focused={focused}
+              />
+            ),
+          }}
+        />
+
+        {/* 4. Perfil & Billetera */}
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: 'Mi Perfil',
+            tabBarIcon: ({ focused }) => (
+              <TabIcon
+                nameFocused="person"
+                nameOutline="person-outline"
+                focused={focused}
+              />
+            ),
+          }}
+        />
+      </Tabs>
+
+      {/* Botón flotante del asistente MOTO IA, visible en todas las pestañas */}
+      <MotoIA />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   tabBar: {
     backgroundColor: colors.surface,
     borderTopColor: colors.border,

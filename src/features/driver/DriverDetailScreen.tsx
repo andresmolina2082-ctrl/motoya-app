@@ -1,14 +1,65 @@
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Card from '@/components/Card';
-import Badge from '@/components/Badge';
 import { colors, radius, shadow } from '@/theme';
+import { useAuth, type SessionUser } from '@/features/auth/AuthContext';
+
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+}
 
 export default function DriverDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const safeId = id ?? 'DRV-GENERAL';
+  const { getDriverById } = useAuth();
+
+  const [driver, setDriver] = useState<SessionUser | null | undefined>(undefined);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (!id) {
+        setDriver(null);
+        return;
+      }
+      getDriverById(id).then(setDriver);
+    }, 0);
+    return () => clearTimeout(timeoutId);
+  }, [id, getDriverById]);
+
+  if (driver === undefined) {
+    return (
+      <View style={styles.outerContainer}>
+        <View style={[styles.container, styles.centered]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </View>
+    );
+  }
+
+  if (driver === null) {
+    return (
+      <View style={styles.outerContainer}>
+        <View style={[styles.container, styles.centered]}>
+          <Ionicons name="alert-circle-outline" size={32} color={colors.textMuted} />
+          <Text style={styles.notFoundTitle}>Mototaxista no encontrado</Text>
+          <Text style={styles.notFoundText}>
+            Esta cuenta ya no está disponible o el enlace es inválido.
+          </Text>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={16} color={colors.secondary} />
+            <Text style={styles.backButtonText}>Volver</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.outerContainer}>
@@ -17,43 +68,33 @@ export default function DriverDetailScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Banner de Verificación de Expo Router */}
-          <View style={styles.expoBadgeRow}>
-            <Ionicons name="code-slash" size={16} color={colors.primaryDark} />
-            <Text style={styles.expoBadgeText}>
-              Ruta dinámica: <Text style={styles.expoBadgeBold}>driver/[id].tsx</Text>
-            </Text>
-          </View>
-
           {/* Tarjeta del Mototaxista */}
           <Card style={styles.profileCard}>
             <View style={styles.avatarSection}>
               <View style={styles.avatarWrap}>
-                <Text style={styles.avatarInitials}>JG</Text>
+                <Text style={styles.avatarInitials}>{getInitials(driver.name)}</Text>
                 <View style={styles.verifiedBadge}>
                   <Ionicons name="shield-checkmark" size={14} color="#FFFFFF" />
                 </View>
               </View>
 
-              <Text style={styles.driverName}>Jader Gómez Epieyú</Text>
-              <Text style={styles.driverLocation}>Riohacha, La Guajira · 4 años en MotoYa</Text>
+              <Text style={styles.driverName}>{driver.name}</Text>
+              <Text style={styles.driverLocation}>Riohacha, La Guajira · Mototaxista MotoYa</Text>
 
               <View style={styles.ratingBadgeRow}>
                 <View style={styles.starsPill}>
                   <Ionicons name="star" size={14} color="#D97706" />
-                  <Text style={styles.starsText}>4.9</Text>
+                  <Text style={styles.starsText}>Nuevo</Text>
                 </View>
-                <Text style={styles.tripsCount}>1.420 carreras completadas</Text>
+                <Text style={styles.tripsCount}>Aún sin carreras registradas</Text>
               </View>
             </View>
 
             {/* Cuadro del Parámetro Dinámico [id] */}
             <View style={styles.idBox}>
               <Text style={styles.idLabel}>CÓDIGO DE CONDUCTOR VERIFICADO</Text>
-              <Text style={styles.idValue}>{safeId}</Text>
-              <Text style={styles.idHint}>
-                Parámetro extraído dinámicamente con useLocalSearchParams()
-              </Text>
+              <Text style={styles.idValue}>{driver.id}</Text>
+              <Text style={styles.idHint}>Teléfono de contacto: {driver.phone}</Text>
             </View>
 
             {/* Ficha Técnica de la Motocicleta */}
@@ -65,61 +106,17 @@ export default function DriverDetailScreen() {
             <View style={styles.motoGrid}>
               <View style={styles.motoCol}>
                 <Text style={styles.motoLabel}>MODELO</Text>
-                <Text style={styles.motoVal}>Bajaj Boxer CT 100</Text>
+                <Text style={styles.motoVal}>{driver.motoModel ?? 'No especificado'}</Text>
               </View>
               <View style={styles.motoCol}>
                 <Text style={styles.motoLabel}>PLACA COLOMBIA</Text>
-                <View style={styles.plateContainer}>
-                  <Text style={styles.plateText}>QWE-45F</Text>
-                </View>
-              </View>
-              <View style={styles.motoCol}>
-                <Text style={styles.motoLabel}>COLOR / AÑO</Text>
-                <Text style={styles.motoVal}>Negro Mate · 2024</Text>
-              </View>
-              <View style={styles.motoCol}>
-                <Text style={styles.motoLabel}>ESTADO MECÁNICO</Text>
-                <Badge text="EXCELENTE 10/10" color={colors.primary} />
-              </View>
-            </View>
-
-            {/* Protocolos de Seguridad y Normativa */}
-            <View style={[styles.sectionHeader, { marginTop: 16 }]}>
-              <Ionicons name="shield" size={16} color={colors.primaryDark} />
-              <Text style={styles.sectionTitle}>SEGURIDAD & DOCUMENTACIÓN</Text>
-            </View>
-
-            <View style={styles.securityList}>
-              <View style={styles.securityItem}>
-                <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
-                <View style={styles.securityTextWrap}>
-                  <Text style={styles.securityTitle}>2 Cascos Certificados (DOT / ECE)</Text>
-                  <Text style={styles.securitySub}>Incluye gorro higiénico para el pasajero</Text>
-                </View>
-              </View>
-
-              <View style={styles.securityItem}>
-                <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
-                <View style={styles.securityTextWrap}>
-                  <Text style={styles.securityTitle}>SOAT Vigente</Text>
-                  <Text style={styles.securitySub}>Seguros del Estado · Vence Noviembre 2026</Text>
-                </View>
-              </View>
-
-              <View style={styles.securityItem}>
-                <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
-                <View style={styles.securityTextWrap}>
-                  <Text style={styles.securityTitle}>Revisión Tecnomecánica al día</Text>
-                  <Text style={styles.securitySub}>CDA Guajira · Certificado vigente</Text>
-                </View>
-              </View>
-
-              <View style={styles.securityItem}>
-                <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
-                <View style={styles.securityTextWrap}>
-                  <Text style={styles.securityTitle}>Chaleco Reflectivo Reglamentario</Text>
-                  <Text style={styles.securitySub}>Cumple norma de tránsito nocturno</Text>
-                </View>
+                {driver.plate ? (
+                  <View style={styles.plateContainer}>
+                    <Text style={styles.plateText}>{driver.plate}</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.motoVal}>No especificada</Text>
+                )}
               </View>
             </View>
 
@@ -127,10 +124,10 @@ export default function DriverDetailScreen() {
             <View style={styles.actionRow}>
               <Pressable
                 style={styles.actionCallBtn}
-                onPress={() => router.push('/trip/TRP-301')}
+                onPress={() => router.push(`/trip/${driver.id}`)}
               >
                 <Ionicons name="flash" size={18} color="#FFFFFF" />
-                <Text style={styles.actionCallBtnText}>Iniciar Carrera con Jader</Text>
+                <Text style={styles.actionCallBtnText}>Iniciar Carrera con {driver.name}</Text>
               </Pressable>
             </View>
           </Card>
@@ -158,28 +155,26 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
   },
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 24,
+  },
+  notFoundTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: colors.textPrimary,
+    marginTop: 4,
+  },
+  notFoundText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
   scrollContent: {
     padding: 16,
     paddingBottom: 40,
-  },
-  expoBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.primarySubtle,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radius.md,
-    marginBottom: 14,
-  },
-  expoBadgeText: {
-    fontSize: 12,
-    color: colors.primaryDark,
-  },
-  expoBadgeBold: {
-    fontWeight: '800',
   },
   profileCard: {
     padding: 18,
@@ -269,10 +264,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   idValue: {
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: '900',
     color: colors.primaryDark,
-    letterSpacing: 1.5,
+    letterSpacing: 1,
     marginVertical: 2,
   },
   idHint: {
@@ -329,27 +324,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     color: '#713F12',
-  },
-  securityList: {
-    gap: 10,
-    marginBottom: 18,
-  },
-  securityItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  securityTextWrap: {
-    flex: 1,
-  },
-  securityTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.textPrimary,
-  },
-  securitySub: {
-    fontSize: 10,
-    color: colors.textMuted,
   },
   actionRow: {
     marginTop: 6,

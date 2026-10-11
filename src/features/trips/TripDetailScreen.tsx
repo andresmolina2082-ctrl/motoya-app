@@ -1,14 +1,37 @@
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Card from '@/components/Card';
-import Badge from '@/components/Badge';
 import { colors, radius, shadow } from '@/theme';
+import { useAuth, type SessionUser } from '@/features/auth/AuthContext';
+import LiveTripMap from '@/features/trips/LiveTripMap';
+
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+}
 
 export default function TripDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { getDriverById } = useAuth();
   const safeId = id ?? 'TRP-ACTUAL';
+
+  const [driver, setDriver] = useState<SessionUser | null>(null);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (!id) return;
+      getDriverById(id).then(setDriver);
+    }, 0);
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   return (
     <View style={styles.outerContainer}>
@@ -47,22 +70,37 @@ export default function TripDetailScreen() {
             {/* Información del Conductor Asignado */}
             <View style={styles.driverRow}>
               <View style={styles.driverAvatar}>
-                <Text style={styles.driverAvatarText}>JG</Text>
+                <Text style={styles.driverAvatarText}>
+                  {driver ? getInitials(driver.name) : '?'}
+                </Text>
               </View>
               <View style={styles.driverDetails}>
                 <View style={styles.nameRow}>
-                  <Text style={styles.driverName}>Jader Gómez</Text>
-                  <Ionicons name="shield-checkmark" size={14} color={colors.primary} />
+                  <Text style={styles.driverName}>{driver?.name ?? 'Buscando mototaxista...'}</Text>
+                  {driver && (
+                    <Ionicons name="shield-checkmark" size={14} color={colors.primary} />
+                  )}
                 </View>
-                <Text style={styles.driverMoto}>
-                  Bajaj Boxer CT 100 · Placa <Text style={styles.plateText}>QWE-45F</Text>
-                </Text>
+                {driver && (
+                  <Text style={styles.driverMoto}>
+                    {driver.motoModel ?? 'Moto registrada'}
+                    {driver.plate ? (
+                      <>
+                        {' · Placa '}
+                        <Text style={styles.plateText}>{driver.plate}</Text>
+                      </>
+                    ) : null}
+                  </Text>
+                )}
                 <View style={styles.etaBadge}>
                   <Ionicons name="time" size={12} color={colors.primaryDark} />
-                  <Text style={styles.etaText}>Llega en ~2 min (a 350 metros)</Text>
+                  <Text style={styles.etaText}>En camino hacia tu punto de recogida</Text>
                 </View>
               </View>
             </View>
+
+            {/* Mapa en vivo de la carrera */}
+            <LiveTripMap />
 
             {/* Desglose de la Carrera */}
             <View style={styles.tripBreakdown}>

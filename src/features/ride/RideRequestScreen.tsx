@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,13 +6,17 @@ import {
   StyleSheet,
   Pressable,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
-import { Link, useRouter } from 'expo-router';
+import { Link, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import Card from '@/components/Card';
 import FareCounter from '@/components/FareCounter';
+import AddressAutocompleteInput from '@/components/AddressAutocompleteInput';
 import { colors, radius, shadow } from '@/theme';
+import { useAuth } from '@/features/auth/AuthContext';
 
 const MOTO_TYPES = [
   {
@@ -40,14 +44,74 @@ const MOTO_TYPES = [
 
 export default function RideRequestScreen() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const topPadding = Math.max(insets.top, Platform.OS === 'web' ? 16 : 24);
+  const { listDrivers } = useAuth();
 
-  const [origin, setOrigin] = useState('Parque Nicolás de Federmann');
-  const [destination, setDestination] = useState('Univ. de La Guajira - Campus Central');
+  const [origin, setOrigin] = useState('');
+  const [destination, setDestination] = useState('');
+  const [locatingOrigin, setLocatingOrigin] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [fare, setFare] = useState(3500);
   const [selectedType, setSelectedType] = useState('standard');
   const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'nequi' | 'daviplata'>('efectivo');
+  const [nearbyDriversCount, setNearbyDriversCount] = useState<number | null>(null);
+
+  const detectCurrentLocation = async () => {
+    setLocatingOrigin(true);
+    setLocationError(null);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setLocationError('Activa el permiso de ubicación o escribe tu dirección');
+        return;
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      try {
+        const [place] = await Location.reverseGeocodeAsync({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+        const line = [place?.street, place?.name].filter(Boolean).join(' ');
+        const city = place?.city ?? place?.subregion ?? place?.district;
+        setOrigin([line, city].filter(Boolean).join(', ') || 'Ubicación actual');
+      } catch {
+        setOrigin(
+          `Ubicación actual (${position.coords.latitude.toFixed(5)}, ${position.coords.longitude.toFixed(5)})`,
+        );
+      }
+    } catch {
+      setLocationError('No se pudo obtener tu ubicación, escríbela manualmente');
+    } finally {
+      setLocatingOrigin(false);
+    }
+  };
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      detectCurrentLocation();
+    }, 0);
+    return () => clearTimeout(timeoutId);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      const timeoutId = setTimeout(() => {
+        listDrivers().then((drivers) => {
+          if (!cancelled) setNearbyDriversCount(drivers.length);
+        });
+      }, 0);
+      return () => {
+        cancelled = true;
+        clearTimeout(timeoutId);
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
 
   return (
     <View style={styles.outerContainer}>
@@ -55,6 +119,7 @@ export default function RideRequestScreen() {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {/* Header Superior con Identidad MotoYa */}
           <View style={[styles.hero, { paddingTop: topPadding }]}>
@@ -73,7 +138,13 @@ export default function RideRequestScreen() {
 
               <View style={styles.statusPill}>
                 <View style={styles.statusDot} />
-                <Text style={styles.statusText}>18 Motos Cerca</Text>
+                <Text style={styles.statusText}>
+                  {nearbyDriversCount === null
+                    ? 'Buscando motos...'
+                    : nearbyDriversCount === 0
+                    ? 'Sin motos cerca'
+                    : `${nearbyDriversCount} Moto${nearbyDriversCount === 1 ? '' : 's'} Cerca`}
+                </Text>
               </View>
             </View>
 
@@ -99,11 +170,31 @@ export default function RideRequestScreen() {
                   <View style={styles.pointBlock}>
                     <Text style={styles.pointLabel}>PUNTO DE RECOGIDA</Text>
                     <View style={styles.pointInputRow}>
-                      <Text style={styles.pointValue} numberOfLines={1}>
-                        {origin}
-                      </Text>
-                      <Ionicons name="locate" size={16} color={colors.primaryDark} />
+                      <AddressAutocompleteInput
+                        style={styles.pointValue}
+                        value={origin}
+                        onChangeText={setOrigin}
+                        onSelectAddress={setOrigin}
+                        placeholder={
+                          locatingOrigin ? 'Detectando tu ubicación...' : 'Escribe dónde estás'
+                        }
+                        placeholderTextColor={colors.textMuted}
+                      />
+                      <Pressable
+                        onPress={detectCurrentLocation}
+                        disabled={locatingOrigin}
+                        hitSlop={8}
+                      >
+                        {locatingOrigin ? (
+                          <ActivityIndicator size="small" color={colors.primaryDark} />
+                        ) : (
+                          <Ionicons name="locate" size={16} color={colors.primaryDark} />
+                        )}
+                      </Pressable>
                     </View>
+                    {locationError && (
+                      <Text style={styles.locationErrorText}>{locationError}</Text>
+                    )}
                   </View>
 
                   <View style={styles.pointDivider} />
@@ -112,9 +203,14 @@ export default function RideRequestScreen() {
                   <View style={styles.pointBlock}>
                     <Text style={styles.pointLabel}>DESTINO</Text>
                     <View style={styles.pointInputRow}>
-                      <Text style={styles.pointValue} numberOfLines={1}>
-                        {destination}
-                      </Text>
+                      <AddressAutocompleteInput
+                        style={styles.pointValue}
+                        value={destination}
+                        onChangeText={setDestination}
+                        onSelectAddress={setDestination}
+                        placeholder="¿A dónde vas?"
+                        placeholderTextColor={colors.textMuted}
+                      />
                       <Ionicons name="search" size={16} color={colors.textMuted} />
                     </View>
                   </View>
@@ -252,7 +348,7 @@ export default function RideRequestScreen() {
             </View>
 
             {/* 5. Botón de Acción Principal (Navegación Declarativa al Modal de Ofertas) */}
-            <Link href="/modal" asChild>
+            <Link href={{ pathname: '/modal', params: { fare: String(fare) } }} asChild>
               <Pressable style={styles.findButton}>
                 <Ionicons name="radio" size={22} color="#FFFFFF" />
                 <Text style={styles.findButtonText}>
@@ -260,23 +356,6 @@ export default function RideRequestScreen() {
                 </Text>
               </Pressable>
             </Link>
-
-            {/* Acceso Rápido a Mototaxista de Confianza */}
-            <Card
-              onPress={() => router.push('/driver/DRV-101')}
-              style={styles.trustDriverCard}
-            >
-              <View style={styles.trustDriverRow}>
-                <View style={styles.trustAvatar}>
-                  <Text style={styles.trustAvatarText}>JG</Text>
-                </View>
-                <View style={styles.trustInfo}>
-                  <Text style={styles.trustName}>Jader Gómez (Conductor Favorito)</Text>
-                  <Text style={styles.trustMoto}>Bajaj Boxer CT 100 · Placa QWE-45F</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-              </View>
-            </Card>
           </View>
         </ScrollView>
       </View>
@@ -444,6 +523,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.borderLight,
     marginVertical: 6,
   },
+  locationErrorText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.danger,
+    marginTop: 4,
+  },
   routeMeta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -571,40 +656,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 0.2,
-  },
-  trustDriverCard: {
-    marginTop: 14,
-    padding: 12,
-  },
-  trustDriverRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  trustAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.secondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  trustAvatarText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  trustInfo: {
-    flex: 1,
-  },
-  trustName: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.textPrimary,
-  },
-  trustMoto: {
-    fontSize: 10,
-    color: colors.textMuted,
-    marginTop: 1,
   },
 });

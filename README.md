@@ -21,7 +21,13 @@ Aplicación móvil desarrollada con **Expo Router** y **React Native** para el s
 5. **Navegación Ergonómica por Pestañas (Tabs)**:
    - **Pedir Moto** (Solicitud rápida con selección de origen/destino).
    - **Mis Viajes** (Historial de carreras activas y completadas).
+   - **GeoCam** (Módulo de inspección fotográfica, GPS permanente y categorías).
    - **Mi Perfil** (Billetera y switch a Modo Conductor).
+6. **GeoCam Persistente (CRUD + Relaciones + Segunda Migración)**:
+   - Control de versiones SQLite con `PRAGMA user_version = 2`.
+   - Entidad relacionada `geocam_categories` vinculada con Foreign Key (1:N).
+   - Almacenamiento permanente de fotografías en el sistema de archivos (`FileSystem.documentDirectory`).
+   - Bitácora de auditoría detallada en [AI-LOG.md](./AI-LOG.md).
 
 ---
 

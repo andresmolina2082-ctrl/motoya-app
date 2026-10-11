@@ -1,15 +1,24 @@
-import { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Switch, Pressable, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Platform, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Card from '@/components/Card';
 import Badge from '@/components/Badge';
 import { colors, radius, shadow } from '@/theme';
+import { useAuth } from '@/features/auth/AuthContext';
+
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+}
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const topPadding = Math.max(insets.top, Platform.OS === 'web' ? 16 : 24);
-  const [driverMode, setDriverMode] = useState(false);
+  const { user, logout } = useAuth();
 
   return (
     <View style={styles.outerContainer}>
@@ -22,14 +31,18 @@ export default function ProfileScreen() {
           <View style={[styles.hero, { paddingTop: topPadding }]}>
             <View style={styles.profileHeaderRow}>
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>AM</Text>
+                <Text style={styles.avatarText}>{getInitials(user?.name ?? '?')}</Text>
               </View>
               <View>
-                <Text style={styles.userName}>Andrés Molina</Text>
-                <Text style={styles.userLocation}>Riohacha · La Guajira 📍</Text>
+                <Text style={styles.userName}>{user?.name}</Text>
+                <Text style={styles.userLocation}>
+                  {user?.role === 'driver' ? user?.motoModel ?? 'Mototaxista' : user?.phone}
+                </Text>
                 <View style={styles.ratingBadge}>
                   <Ionicons name="star" size={12} color={colors.accent} />
-                  <Text style={styles.ratingText}>4.95 Pasajero Confiable</Text>
+                  <Text style={styles.ratingText}>
+                    {user?.role === 'driver' ? '4.95 Mototaxista Confiable' : '4.95 Pasajero Confiable'}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -37,72 +50,53 @@ export default function ProfileScreen() {
 
           {/* Cuerpo */}
           <View style={styles.body}>
-            {/* Modo Conductor Switch */}
-            <Card style={styles.driverSwitchCard}>
-              <View style={styles.switchRow}>
-                <View style={styles.switchIcon}>
-                  <Ionicons name="bicycle" size={20} color={colors.primaryDark} />
+            {/* Billetera y Métodos de Pago (solo mototaxistas) */}
+            {user?.role === 'driver' && (
+              <>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>BILLETERA & MEDIOS DE PAGO</Text>
                 </View>
-                <View style={styles.switchTextCol}>
-                  <Text style={styles.switchTitle}>Modo Mototaxista</Text>
-                  <Text style={styles.switchSub}>
-                    {driverMode
-                      ? 'Estás recibiendo ofertas de carreras'
-                      : '¿Tienes moto? Genera ingresos en tus ratos libres'}
-                  </Text>
-                </View>
-                <Switch
-                  value={driverMode}
-                  onValueChange={setDriverMode}
-                  trackColor={{ false: colors.border, true: colors.primary }}
-                  thumbColor="#FFFFFF"
-                />
-              </View>
-            </Card>
 
-            {/* Billetera y Métodos de Pago */}
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>BILLETERA & MEDIOS DE PAGO</Text>
-            </View>
+                <Card style={styles.walletCard}>
+                  <View style={styles.paymentMethodItem}>
+                    <View style={[styles.methodIcon, { backgroundColor: '#FDF2F8' }]}>
+                      <Text style={{ fontSize: 16 }}>📲</Text>
+                    </View>
+                    <View style={styles.methodInfo}>
+                      <Text style={styles.methodName}>Nequi</Text>
+                      <Text style={styles.methodDetail}>Vinculado (***-8291)</Text>
+                    </View>
+                    <Badge text="PREDETERMINADO" color={colors.primaryDark} />
+                  </View>
 
-            <Card style={styles.walletCard}>
-              <View style={styles.paymentMethodItem}>
-                <View style={[styles.methodIcon, { backgroundColor: '#FDF2F8' }]}>
-                  <Text style={{ fontSize: 16 }}>📲</Text>
-                </View>
-                <View style={styles.methodInfo}>
-                  <Text style={styles.methodName}>Nequi</Text>
-                  <Text style={styles.methodDetail}>Vinculado (***-8291)</Text>
-                </View>
-                <Badge text="PREDETERMINADO" color={colors.primaryDark} />
-              </View>
+                  <View style={styles.methodDivider} />
 
-              <View style={styles.methodDivider} />
+                  <View style={styles.paymentMethodItem}>
+                    <View style={[styles.methodIcon, { backgroundColor: '#FEF2F2' }]}>
+                      <Text style={{ fontSize: 16 }}>🏦</Text>
+                    </View>
+                    <View style={styles.methodInfo}>
+                      <Text style={styles.methodName}>Daviplata</Text>
+                      <Text style={styles.methodDetail}>Vinculado (***-4012)</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                  </View>
 
-              <View style={styles.paymentMethodItem}>
-                <View style={[styles.methodIcon, { backgroundColor: '#FEF2F2' }]}>
-                  <Text style={{ fontSize: 16 }}>🏦</Text>
-                </View>
-                <View style={styles.methodInfo}>
-                  <Text style={styles.methodName}>Daviplata</Text>
-                  <Text style={styles.methodDetail}>Vinculado (***-4012)</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-              </View>
+                  <View style={styles.methodDivider} />
 
-              <View style={styles.methodDivider} />
-
-              <View style={styles.paymentMethodItem}>
-                <View style={[styles.methodIcon, { backgroundColor: colors.primarySubtle }]}>
-                  <Text style={{ fontSize: 16 }}>💵</Text>
-                </View>
-                <View style={styles.methodInfo}>
-                  <Text style={styles.methodName}>Efectivo</Text>
-                  <Text style={styles.methodDetail}>Pago directo al mototaxista</Text>
-                </View>
-                <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
-              </View>
-            </Card>
+                  <View style={styles.paymentMethodItem}>
+                    <View style={[styles.methodIcon, { backgroundColor: colors.primarySubtle }]}>
+                      <Text style={{ fontSize: 16 }}>💵</Text>
+                    </View>
+                    <View style={styles.methodInfo}>
+                      <Text style={styles.methodName}>Efectivo</Text>
+                      <Text style={styles.methodDetail}>Pago directo al pasajero</Text>
+                    </View>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                  </View>
+                </Card>
+              </>
+            )}
 
             {/* Seguridad y Preferencias */}
             <View style={styles.sectionHeader}>
@@ -132,6 +126,11 @@ export default function ProfileScreen() {
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </View>
             </Card>
+
+            <Pressable style={styles.logoutButton} onPress={() => logout()}>
+              <Ionicons name="log-out-outline" size={18} color={colors.danger} />
+              <Text style={styles.logoutText}>Cerrar sesión</Text>
+            </Pressable>
           </View>
         </ScrollView>
       </View>
@@ -212,36 +211,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginTop: -16,
   },
-  driverSwitchCard: {
-    padding: 14,
-    marginBottom: 16,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  switchIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.primarySubtle,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  switchTextCol: {
-    flex: 1,
-  },
-  switchTitle: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: colors.textPrimary,
-  },
-  switchSub: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginTop: 1,
-  },
   sectionHeader: {
     marginBottom: 8,
     paddingHorizontal: 2,
@@ -308,5 +277,22 @@ const styles = StyleSheet.create({
   safetySub: {
     fontSize: 11,
     color: colors.textMuted,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 20,
+    paddingVertical: 14,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.dangerSoft,
+    backgroundColor: colors.dangerSoft,
+  },
+  logoutText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: colors.danger,
   },
 });

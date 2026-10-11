@@ -1,62 +1,42 @@
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Card from '@/components/Card';
 import Badge from '@/components/Badge';
 import { colors, radius, shadow } from '@/theme';
+import { useAuth, type SessionUser } from '@/features/auth/AuthContext';
 
-const DRIVER_BIDS = [
-  {
-    id: 'DRV-101',
-    name: 'Jader Gómez',
-    moto: 'Bajaj Boxer CT 100',
-    plate: 'QWE-45F',
-    rating: '4.9',
-    trips: '1.420',
-    bidFare: 3500,
-    eta: '2 min',
-    isAccepted: true, // Aceptó el precio propuesto por el usuario
-    tripId: 'TRP-301',
-    distance: '350 m',
-  },
-  {
-    id: 'DRV-102',
-    name: 'Maikel Redondo',
-    moto: 'Suzuki GN 125',
-    plate: 'RTY-12C',
-    rating: '4.8',
-    trips: '890',
-    bidFare: 4000,
-    eta: '1 min',
-    isAccepted: false, // Contraoferta
-    tripId: 'TRP-302',
-    distance: '180 m (¡Muy cerca!)',
-  },
-  {
-    id: 'DRV-103',
-    name: 'Wilmer Epieyú',
-    moto: 'Yamaha YBR 125',
-    plate: 'UIO-89E',
-    rating: '5.0',
-    trips: '510',
-    bidFare: 3500,
-    eta: '3 min',
-    isAccepted: true,
-    tripId: 'TRP-303',
-    distance: '600 m',
-  },
-];
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+}
 
 export default function OfferRadarModal() {
   const router = useRouter();
+  const { listDrivers } = useAuth();
+  const { fare: fareParam } = useLocalSearchParams<{ fare?: string }>();
+  const requestedFare = Number(fareParam) || 3500;
 
-  const handleAcceptBid = (tripId: string) => {
-    // Navegación programática hacia el seguimiento de la carrera activa
-    router.push(`/trip/${tripId}`);
+  const [drivers, setDrivers] = useState<SessionUser[] | null>(null);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      listDrivers().then(setDrivers);
+    }, 0);
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleAcceptBid = (driverId: string) => {
+    router.push(`/trip/${driverId}`);
   };
 
   const handleViewProfile = (driverId: string) => {
-    // Navegación programática hacia la ruta dinámica del conductor
     router.push(`/driver/${driverId}`);
   };
 
@@ -75,6 +55,7 @@ export default function OfferRadarModal() {
           {/* Header de Búsqueda Activa */}
           <View style={styles.radarHeader}>
             <View style={styles.pulseIconWrap}>
+              <Ionicons name="wifi" size={24} color={colors.primary} />
               <Ionicons name="radio" size={24} color={colors.primary} />
             </View>
             <View style={styles.radarHeaderContent}>
@@ -83,98 +64,108 @@ export default function OfferRadarModal() {
                 <Badge text="BUSCANDO" color={colors.primary} />
               </View>
               <Text style={styles.radarSubtitle}>
-                3 mototaxistas cercanos han respondido a tu solicitud
+                {drivers === null
+                  ? 'Buscando mototaxistas registrados...'
+                  : drivers.length > 0
+                  ? `${drivers.length} mototaxista${drivers.length === 1 ? '' : 's'} disponible${drivers.length === 1 ? '' : 's'} para tu carrera`
+                  : 'Aún no hay mototaxistas registrados'}
               </Text>
             </View>
           </View>
 
+          {drivers === null && (
+            <View style={styles.emptyState}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          )}
+
+          {drivers !== null && drivers.length === 0 && (
+            <Card style={styles.emptyCard}>
+              <Ionicons name="bicycle-outline" size={28} color={colors.textMuted} />
+              <Text style={styles.emptyTitle}>Sin mototaxistas aún</Text>
+              <Text style={styles.emptyText}>
+                Cuando un mototaxista cree su cuenta en MotoYa, aparecerá aquí para ofertar por
+                tu carrera.
+              </Text>
+            </Card>
+          )}
+
           {/* Tarjetas de Ofertas Entrantes (estilo inDriver) */}
-          <View style={styles.bidsList}>
-            {DRIVER_BIDS.map((bid) => (
-              <Card key={bid.id} style={styles.bidCard}>
-                {/* Fila superior: Conductor y Tarifa */}
-                <View style={styles.bidTopRow}>
-                  <View style={styles.driverInfoCol}>
-                    <View style={styles.driverHeaderRow}>
-                      <View style={styles.driverAvatar}>
-                        <Text style={styles.driverAvatarText}>
-                          {bid.name
-                            .split(' ')
-                            .map((n) => n[0])
-                            .join('')}
-                        </Text>
-                      </View>
-                      <View>
-                        <View style={styles.nameRow}>
-                          <Text style={styles.driverName}>{bid.name}</Text>
-                          <Ionicons name="checkmark-circle" size={14} color={colors.primary} />
+          {drivers !== null && drivers.length > 0 && (
+            <View style={styles.bidsList}>
+              {drivers.map((driver) => (
+                <Card key={driver.id} style={styles.bidCard}>
+                  {/* Fila superior: Conductor y Tarifa */}
+                  <View style={styles.bidTopRow}>
+                    <View style={styles.driverInfoCol}>
+                      <View style={styles.driverHeaderRow}>
+                        <View style={styles.driverAvatar}>
+                          <Text style={styles.driverAvatarText}>{getInitials(driver.name)}</Text>
                         </View>
-                        <View style={styles.ratingRow}>
-                          <Ionicons name="star" size={12} color={colors.accent} />
-                          <Text style={styles.ratingText}>
-                            {bid.rating} · ({bid.trips} carreras)
-                          </Text>
+                        <View>
+                          <View style={styles.nameRow}>
+                            <Text style={styles.driverName}>{driver.name}</Text>
+                            <Ionicons name="checkmark-circle" size={14} color={colors.primary} />
+                          </View>
+                          <View style={styles.ratingRow}>
+                            <Ionicons name="star" size={12} color={colors.accent} />
+                            <Text style={styles.ratingText}>Nuevo en MotoYa</Text>
+                          </View>
                         </View>
                       </View>
                     </View>
-                  </View>
 
-                  {/* Tarifa Ofertada */}
-                  <View style={styles.fareCol}>
-                    <Text style={styles.fareAmount}>
-                      ${bid.bidFare.toLocaleString('es-CO')}
-                    </Text>
-                    {bid.isAccepted ? (
+                    {/* Tarifa Ofertada */}
+                    <View style={styles.fareCol}>
+                      <Text style={styles.fareAmount}>
+                        ${requestedFare.toLocaleString('es-CO')}
+                      </Text>
                       <Badge text="ACEPTÓ TU OFERTA" color={colors.primary} />
-                    ) : (
-                      <Badge text="CONTRAOFERTA" color={colors.accentDark} />
-                    )}
-                  </View>
-                </View>
-
-                {/* Detalles de la Moto y Llegada */}
-                <View style={styles.motoDetailBox}>
-                  <View style={styles.motoItem}>
-                    <Ionicons name="bicycle" size={15} color={colors.primaryDark} />
-                    <Text style={styles.motoName}>{bid.moto}</Text>
-                    <View style={styles.plateBadge}>
-                      <Text style={styles.plateText}>{bid.plate}</Text>
                     </View>
                   </View>
 
-                  <View style={styles.etaItem}>
-                    <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
-                    <Text style={styles.etaText}>
-                      Llega en <Text style={styles.etaBold}>{bid.eta}</Text> ({bid.distance})
-                    </Text>
+                  {/* Detalles de la Moto y Llegada */}
+                  <View style={styles.motoDetailBox}>
+                    <View style={styles.motoItem}>
+                      <Ionicons name="bicycle" size={15} color={colors.primaryDark} />
+                      <Text style={styles.motoName}>{driver.motoModel ?? 'Moto registrada'}</Text>
+                      {driver.plate && (
+                        <View style={styles.plateBadge}>
+                          <Text style={styles.plateText}>{driver.plate}</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    <View style={styles.etaItem}>
+                      <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
+                      <Text style={styles.etaText}>Disponible ahora cerca de ti</Text>
+                    </View>
                   </View>
-                </View>
 
-                {/* Botones de Acción */}
-                <View style={styles.actionButtonsRow}>
-                  {/* Botón ver perfil (Ruta Dinámica) */}
-                  <Pressable
-                    style={styles.profileBtn}
-                    onPress={() => handleViewProfile(bid.id)}
-                  >
-                    <Ionicons name="person-circle-outline" size={16} color={colors.secondary} />
-                    <Text style={styles.profileBtnText}>Ver Moto</Text>
-                  </Pressable>
+                  {/* Botones de Acción */}
+                  <View style={styles.actionButtonsRow}>
+                    <Pressable
+                      style={styles.profileBtn}
+                      onPress={() => handleViewProfile(driver.id)}
+                    >
+                      <Ionicons name="person-circle-outline" size={16} color={colors.secondary} />
+                      <Text style={styles.profileBtnText}>Ver Moto</Text>
+                    </Pressable>
 
-                  {/* Botón aceptar carrera (Inicia viaje) */}
-                  <Pressable
-                    style={styles.acceptBtn}
-                    onPress={() => handleAcceptBid(bid.tripId)}
-                  >
-                    <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-                    <Text style={styles.acceptBtnText}>
-                      Aceptar por ${bid.bidFare.toLocaleString('es-CO')}
-                    </Text>
-                  </Pressable>
-                </View>
-              </Card>
-            ))}
-          </View>
+                    <Pressable
+                      style={styles.acceptBtn}
+                      onPress={() => handleAcceptBid(driver.id)}
+                    >
+                      <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                      <Text style={styles.acceptBtnText}>
+                        Aceptar por ${requestedFare.toLocaleString('es-CO')}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </Card>
+              ))}
+            </View>
+          )}
 
           {/* Botón para cancelar y volver */}
           <Pressable style={styles.cancelBtn} onPress={() => router.back()}>
@@ -245,6 +236,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  emptyCard: {
+    alignItems: 'center',
+    padding: 24,
+    gap: 6,
+    marginVertical: 8,
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: colors.textPrimary,
+    marginTop: 4,
+  },
+  emptyText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 17,
   },
   bidsList: {
     gap: 12,
@@ -348,10 +361,6 @@ const styles = StyleSheet.create({
   etaText: {
     fontSize: 11,
     color: colors.textSecondary,
-  },
-  etaBold: {
-    fontWeight: '800',
-    color: colors.textPrimary,
   },
   actionButtonsRow: {
     flexDirection: 'row',
